@@ -13,6 +13,7 @@ BTN_RENAME = "✏️ Переименовать"
 BTN_ADMIN_USERS = "👥 Участники"
 BTN_ADMIN_EXPORT = "📤 Экспорт"
 BTN_ADMIN_RUN_NOW = "🚀 Рассылка сейчас"
+BTN_ADMIN_PAIRS = "📅 Текущие пары"
 
 
 def admin_keyboard(is_paused: bool) -> ReplyKeyboardMarkup:
@@ -20,6 +21,7 @@ def admin_keyboard(is_paused: bool) -> ReplyKeyboardMarkup:
         [KeyboardButton(BTN_RESUME if is_paused else BTN_PAUSE)],
         [KeyboardButton(BTN_RENAME)],
         [KeyboardButton(BTN_ADMIN_USERS), KeyboardButton(BTN_ADMIN_EXPORT)],
+        [KeyboardButton(BTN_ADMIN_PAIRS)],
         [KeyboardButton(BTN_ADMIN_RUN_NOW)],
     ]
     return ReplyKeyboardMarkup(base, resize_keyboard=True)
