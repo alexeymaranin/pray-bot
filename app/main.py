@@ -19,10 +19,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from app.admin_handlers import admin_users, admin_export, admin_deactivate, admin_activate, admin_run_now, \
-    admin_next_run
+    admin_next_run, admin_pairs
 from app.client_handlers import start, pause, resume, conversation_handler, rename_conversation_handler, rename_entry
 from app.db import Database
-from app.keyboards import BTN_PAUSE, BTN_RESUME, BTN_RENAME, BTN_ADMIN_USERS, BTN_ADMIN_EXPORT, BTN_ADMIN_RUN_NOW
+from app.keyboards import BTN_PAUSE, BTN_RESUME, BTN_RENAME, BTN_ADMIN_USERS, BTN_ADMIN_EXPORT, BTN_ADMIN_RUN_NOW, \
+    BTN_ADMIN_PAIRS
 from app.scheduler import run_weekly_pairing
 from app.texts import (
     WELCOME_TEXT,
@@ -113,6 +114,7 @@ def main() -> None:
     # app.add_handler(MessageHandler(filters.Regex(f"^{BTN_RENAME}$"), rename_entry))
 
     app.add_handler(MessageHandler(filters.Regex(f"^{BTN_ADMIN_USERS}$"), admin_users))
+    app.add_handler(MessageHandler(filters.Regex(f"^{BTN_ADMIN_PAIRS}$"), admin_pairs))
     app.add_handler(MessageHandler(filters.Regex(f"^{BTN_ADMIN_EXPORT}$"), admin_export))
     app.add_handler(MessageHandler(filters.Regex(f"^{BTN_ADMIN_RUN_NOW}$"), admin_run_now))
 
