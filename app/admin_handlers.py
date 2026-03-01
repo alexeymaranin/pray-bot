@@ -123,3 +123,21 @@ async def admin_run_now(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     tz_name: str = context.application.bot_data["tz_name"]
     await run_weekly_pairing(context.application, db, tz_name)
     await update.message.reply_text(RUN_OK)
+
+
+async def admin_next_run(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_admin(context.application, update.effective_user.id):
+        await update.message.reply_text(ADMIN_ONLY)
+        return
+
+    scheduler = context.application.bot_data.get("scheduler")
+    if not scheduler:
+        await update.message.reply_text("scheduler: ❌ not initialized")
+        return
+
+    job = scheduler.get_job("weekly_pairing")
+    if not job:
+        await update.message.reply_text("job weekly_pairing: ❌ not found")
+        return
+
+    await update.message.reply_text(f"scheduler: ✅ running\nnext_run_time: {job.next_run_time}")
