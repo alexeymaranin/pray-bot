@@ -1,6 +1,7 @@
 import aiosqlite
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
+from collections import defaultdict
 
 
 @dataclass
@@ -163,3 +164,23 @@ class Database:
             )
             await db.commit()
             return cur.rowcount > 0
+
+    async def get_assignments_for_week(self, week_start: str) -> dict[int, set[int]]:
+        """
+        Возвращает словарь:
+        {
+            user_id: {partner_user_id1, partner_user_id2}
+        }
+        """
+        async with aiosqlite.connect(self.path) as db:
+            async with db.execute(
+                    "SELECT user_id, partner_user_id FROM assignments WHERE week_start=?",
+                    (week_start,),
+            ) as cur:
+                rows = await cur.fetchall()
+
+        result = defaultdict(set)
+        for user_id, partner_id in rows:
+            result[user_id].add(partner_id)
+
+        return dict(result)
