@@ -43,3 +43,10 @@ def next_saturday_21(tz_name: str) -> datetime:
     if candidate_dt <= now:
         candidate_dt = candidate_dt + timedelta(days=7)
     return candidate_dt
+
+
+def current_week_start(tz_name: str) -> str:
+    tz = ZoneInfo(tz_name)
+    now = datetime.now(tz=tz)
+    monday = (now - timedelta(days=now.weekday())).date()
+    return monday.isoformat()
