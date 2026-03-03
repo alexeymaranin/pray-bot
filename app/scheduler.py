@@ -1,5 +1,5 @@
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dtime
 from zoneinfo import ZoneInfo
 from typing import List, Tuple, Optional
 
@@ -7,7 +7,6 @@ from telegram.ext import Application
 
 from app.db import Database, User
 from app.texts import PARTNER_TEMPLATE
-
 
 ODD_TRIPLET_TEMPLATE = (
     "Привет, {first_name}!\n\n"
@@ -21,6 +20,43 @@ ODD_TRIPLET_TEMPLATE = (
 )
 
 
+PAIRING_WEEKDAY = 5  # Saturday (Mon=0 ... Sat=5)
+PAIRING_TIME = dtime(20, 0)
+
+
+def monday_of_week(dt: datetime) -> str:
+    monday = (dt - timedelta(days=dt.weekday())).date()
+    return monday.isoformat()
+
+
+def assignment_week_start(dt: datetime) -> str:
+    """
+    Возвращает week_start (понедельник), для которого актуальны пары.
+    Если сейчас воскресенье или суббота после 21:00 — считаем, что пары уже на следующую неделю.
+    """
+    # Следующий понедельник
+    next_monday = (dt + timedelta(days=(7 - dt.weekday()))).date()  # если dt.weekday()==0 => +7
+    # Но нам нужен ближайший будущий понедельник; для Mon..Sun формула выше ок.
+    # Для Mon она даст следующий понедельник через 7 дней — это не то.
+    # Поэтому:
+    if dt.weekday() == 0:
+        next_monday = dt.date()
+
+    is_sunday = dt.weekday() == 6
+    is_sat_after_pairing = dt.weekday() == PAIRING_WEEKDAY and dt.timetz().replace(tzinfo=None) >= PAIRING_TIME
+
+    if is_sunday or is_sat_after_pairing:
+        # Пары уже сформированы на следующую неделю
+        # Найдём ближайший понедельник вперёд
+        days_to_mon = (7 - dt.weekday()) % 7
+        if days_to_mon == 0:
+            days_to_mon = 7
+        return (dt + timedelta(days=days_to_mon)).date().isoformat()
+
+    # Иначе — текущая неделя
+    return monday_of_week(dt)
+
+
 def week_start_for(dt: datetime) -> str:
     monday = (dt - timedelta(days=dt.weekday())).date()
     return monday.isoformat()
@@ -29,8 +65,12 @@ def week_start_for(dt: datetime) -> str:
 async def run_weekly_pairing(app: Application, db: Database, tz_name: str) -> None:
     tz = ZoneInfo(tz_name)
     now = datetime.now(tz=tz)
-    this_week = week_start_for(now)
-    last_week = week_start_for(now - timedelta(days=7))
+    # this_week = week_start_for(now)
+    # last_week = week_start_for(now - timedelta(days=7))
+    this_week = assignment_week_start(now)
+    # "прошлая неделя" — это понедельник недели перед this_week
+    last_week_dt = datetime.fromisoformat(this_week).replace(tzinfo=tz) - timedelta(days=7)
+    last_week = last_week_dt.date().isoformat()
 
     users = await db.get_active_users()
     if len(users) < 2:
