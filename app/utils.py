@@ -50,3 +50,97 @@ def current_week_start(tz_name: str) -> str:
     now = datetime.now(tz=tz)
     monday = (now - timedelta(days=now.weekday())).date()
     return monday.isoformat()
+
+
+def monday_iso(dt: datetime) -> str:
+    monday = (dt - timedelta(days=dt.weekday())).date()
+    return monday.isoformat()
+
+
+def current_and_previous_week_starts(tz_name: str) -> tuple[str, str]:
+    tz = ZoneInfo(tz_name)
+    now = datetime.now(tz=tz)
+    current = monday_iso(now)
+    prev = (datetime.fromisoformat(current) - timedelta(days=7)).date().isoformat()
+    return current, prev
+
+
+def chunk_text(text: str, limit: int = 3900) -> list[str]:
+    parts = []
+    while len(text) > limit:
+        cut = text.rfind("\n", 0, limit)
+        if cut == -1:
+            cut = limit
+        parts.append(text[:cut])
+        text = text[cut:].lstrip("\n")
+    parts.append(text)
+    return parts
+
+
+def _fmt_username(u: str) -> str:
+    u = (u or "").strip()
+    if not u:
+        return "—"
+    if not u.startswith("@"):
+        u = "@" + u.lstrip("@")
+    return u
+
+
+def _user_label(u) -> str:
+    full = f"{(u.first_name or '').strip()} {(u.last_name or '').strip()}".strip()
+    if not full:
+        full = "—"
+    return f"{full} ({_fmt_username(u.username)})"
+
+
+def build_pairs_text(title: str, week_start: str, assignments: dict[int, set[int]], user_map: dict[int, object]) -> str:
+    lines = []
+    lines.append(f"{title}")
+    lines.append(f"Неделя: {week_start}")
+
+    if not assignments:
+        lines.append("Пары ещё не сформированы.")
+        return "\n".join(lines) + "\n"
+
+    visited: set[int] = set()
+    pairs: list[tuple[int, int]] = []
+    triplets: list[set[int]] = []
+
+    for user_id, partners in assignments.items():
+        if user_id in visited:
+            continue
+
+        if len(partners) == 1:
+            partner_id = next(iter(partners))
+            if partner_id in visited:
+                continue
+            pairs.append((user_id, partner_id))
+            visited.update({user_id, partner_id})
+
+        elif len(partners) == 2:
+            group = {user_id, *partners}
+            if group & visited:
+                continue
+            triplets.append(group)
+            visited |= group
+
+    if pairs:
+        lines.append("")
+        lines.append("Пары:")
+        for a, b in pairs:
+            ua, ub = user_map.get(a), user_map.get(b)
+            if ua and ub:
+                lines.append(f" - {_user_label(ua)}  <->  {_user_label(ub)}")
+
+    if triplets:
+        lines.append("")
+        lines.append("Тройки:")
+        for group in triplets:
+            members = [user_map.get(uid) for uid in group]
+            members = [m for m in members if m is not None]
+            if members:
+                lines.append(" - " + "  <->  ".join(_user_label(m) for m in members))
+
+    lines.append("")
+    lines.append(f"Итого: пар={len(pairs)}, троек={len(triplets)}")
+    return "\n".join(lines) + "\n"
