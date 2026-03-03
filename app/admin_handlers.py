@@ -11,7 +11,7 @@ from telegram.ext import (
 from app.db import Database
 from app.scheduler import run_weekly_pairing
 from app.texts import ADMIN_ONLY, UNKNOWN_USER, UPDATED_OK, RUN_OK
-from app.utils import is_admin, current_week_start
+from app.utils import is_admin, current_week_start, current_and_previous_week_starts, build_pairs_text, chunk_text
 
 
 def _status_badge(is_active: int, is_paused: int) -> str:
@@ -151,72 +151,21 @@ async def admin_pairs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     db: Database = context.application.bot_data["db"]
     tz_name: str = context.application.bot_data["tz_name"]
 
-    week_start = current_week_start(tz_name)
-    assignments = await db.get_assignments_for_week(week_start)
+    current_week, prev_week = current_and_previous_week_starts(tz_name)
 
-    if not assignments:
-        await update.message.reply_text("На эту неделю пары ещё не сформированы.")
-        return
+    a_current = await db.get_assignments_for_week(current_week)
+    a_prev = await db.get_assignments_for_week(prev_week)
 
     users = await db.list_users()
     user_map = {u.user_id: u for u in users}
 
-    visited = set()
-    pairs = []
-    triplets = []
-
-    for user_id, partners in assignments.items():
-        if user_id in visited:
-            continue
-
-        if len(partners) == 1:
-            partner_id = list(partners)[0]
-            if partner_id in visited:
-                continue
-
-            pairs.append((user_id, partner_id))
-            visited.add(user_id)
-            visited.add(partner_id)
-
-        elif len(partners) == 2:
-            group = {user_id, *partners}
-            if group & visited:
-                continue
-            triplets.append(group)
-            visited.update(group)
-
-    # Формируем красивый вывод
-    header = f"📅 *Пары на неделю {week_start}*\n\n"
-
-    lines = []
-
-    if pairs:
-        lines.append("🤝 *Пары:*")
-        for a, b in pairs:
-            ua = user_map.get(a)
-            ub = user_map.get(b)
-            if ua and ub:
-                lines.append(
-                    f"• {ua.first_name} {ua.last_name}  —  {ub.first_name} {ub.last_name}"
-                )
-        lines.append("")
-
-    if triplets:
-        lines.append("👥 *Тройки:*")
-        for group in triplets:
-            members = []
-            for uid in group:
-                u = user_map.get(uid)
-                if u:
-                    members.append(f"{u.first_name} {u.last_name}")
-            lines.append("• " + "  —  ".join(members))
-        lines.append("")
-
-    summary = (
-        f"\nВсего пар: *{len(pairs)}*\n"
-        f"Всего троек: *{len(triplets)}*"
+    text = (
+        "Текущие и прошлые пары\n"
+        "======================\n\n"
+        + build_pairs_text("Текущая неделя", current_week, a_current, user_map)
+        + "\n"
+        + build_pairs_text("Прошлая неделя", prev_week, a_prev, user_map)
     )
 
-    text = header + "\n".join(lines) + summary
-
-    await update.message.reply_text(text, parse_mode="Markdown")
+    for part in chunk_text(text):
+        await update.message.reply_text(part)
